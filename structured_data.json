@@ -1,0 +1,32 @@
+{
+  "empresa": "Fanalca S.A.",
+  "nit": "890.300.237-8",
+  "telefono_principal": "(602) 489 3131",
+  "direccion_principal": "Calle 13 #31A - 80, Acopi Yumbo, Valle del Cauca, Colombia",
+  "correo_contacto": "info@fanalca.com",
+  "sitio_web": "https://fanalca.com/",
+  "horario_atencion": "Lunes a viernes de 8:00 a.m. a 5:30 p.m.",
+  "sedes": [
+    {
+      "ciudad": "Yumbo (Principal)",
+      "direccion": "Calle 13 #31A - 80, Zona Industrial Acopi"
+    },
+    {
+      "ciudad": "Bogotá",
+      "direccion": "Carrera 69 #23-55"
+    },
+    {
+      "ciudad": "Medellín",
+      "direccion": "Calle 30 #65B-90"
+    }
+  ],
+  "servicio_cliente": {
+    "telefono": "(602) 489 3131",
+    "correo": "servicioalcliente@fanalca.com"
+  },
+  "redes_sociales": {
+    "linkedin": "https://www.linkedin.com/company/fanalca-s-a/",
+    "instagram": "No cuenta con instagram",
+    "facebook": "No cuenta con facebook"
+  }
+}
