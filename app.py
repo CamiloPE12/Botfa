@@ -18,9 +18,10 @@ load_dotenv()
 
 st.markdown("""
 # 🤖 Fanalca Bot  
-_Asistente virtual corporativo de Fanalca S.A._
+_Asistente virtual corporativo de Fanalca._
 
-💡 Puedes preguntar sobre historia, sostenibilidad, negocios o datos de contacto (NIT, correo, teléfono, etc.).
+💡 Pregunta sobre historia, sostenibilidad, negocios o datos de contacto (NIT, correo, teléfono, etc.).  
+🧑‍💼 Para **empleo/contratación/vacantes**, te doy los canales oficiales de postulación.
 """)
 
 # ==========================================================
@@ -41,7 +42,7 @@ class State(TypedDict):
 # ==========================================================
 # 🤖 CONFIGURACIÓN DEL MODELO Y HERRAMIENTAS
 # ==========================================================
-llm = ChatOllama(model="gemma3:1b", temperature=temperature)
+llm = ChatOllama(model="gemma3:4b", temperature=temperature)
 retriever = FanalcaRetriever("fanalca_knowledge_base_final.json")
 structured_tool = FanalcaStructuredTool("structured_data.json")
 
@@ -50,14 +51,57 @@ structured_tool = FanalcaStructuredTool("structured_data.json")
 # ==========================================================
 ROUTER_PROMPT = """
 Eres el Agente Enrutador Inteligente de FANALCA BOT.
-Debes decidir cuál herramienta responderá la consulta del usuario:
+Debes decidir cuál herramienta responde:
 
-1️⃣ Structured Tool (JSON estructurado) → Datos concretos: correo, teléfono, NIT, dirección, sedes, redes, horarios.
-2️⃣ RAG Retriever (base vectorial) → Información general: historia, proyectos, sostenibilidad, misión, visión, valores.
+1) STRUCTURED → Datos concretos (correo, teléfono, NIT, dirección, sedes, redes, horarios, empleo/contratación/vacantes/RRHH).
+2) RAG → Información general (historia, proyectos, sostenibilidad, misión, visión, valores).
 
 Responde SOLO con una palabra:
 STRUCTURED o RAG
 """
+
+HR_KEYWORDS = [
+    "contratación", "contratacion", "contratar", "selección", "seleccion",
+    "rrhh", "recursos humanos", "talento", "talento humano",
+    "trabaja con nosotros", "trabajar", "empleo", "vacante", "vacantes",
+    "oferta laboral", "ofertas laborales", "postular", "postulación", "hoja de vida",
+    "hv", "curriculum", "currículum", "cv"
+]
+
+BRAND_TERMS = [
+    "fanalca", "honda", "fanalvías", "fanalvias", "acopi", "yumbo", "autopartes", "tubos"
+]
+
+GREETINGS = [
+    "hola", "buenas", "buenos dias", "buenos días", "buenas tardes",
+    "buenas noches", "hey", "holi", "saludos"
+]
+
+# ==========================================================
+# 🔎 UTILIDAD: EXTRAER TEXTO DEL ÚLTIMO MENSAJE DE USUARIO
+# (soporta tuple, dict y objetos HumanMessage/AIMessage)
+# ==========================================================
+def get_last_user_text(messages) -> str:
+    for m in reversed(messages):
+        # tuple: ("user", "texto")
+        if isinstance(m, tuple):
+            if len(m) >= 2 and str(m[0]).lower() in ("user", "human"):
+                return m[1] if isinstance(m[1], str) else str(m[1])
+
+        # dict: {"role": "user", "content": "texto"}
+        if isinstance(m, dict):
+            role = (m.get("role") or m.get("type") or "").lower()
+            content = m.get("content")
+            if role in ("user", "human") and content:
+                return content if isinstance(content, str) else str(content)
+
+        # objeto mensaje (LangChain): .type | .role y .content
+        role = (getattr(m, "role", None) or getattr(m, "type", None) or "").lower()
+        content = getattr(m, "content", None)
+        if role in ("user", "human") and content:
+            return content if isinstance(content, str) else str(content)
+
+    return ""
 
 # ==========================================================
 # 🚦 FUNCIÓN DE ENRUTAMIENTO
@@ -65,24 +109,29 @@ STRUCTURED o RAG
 def route_query(user_query: str) -> str:
     q = user_query.lower().strip()
 
-    # Heurística rápida
+    # 1) Empleo/contratación → STRUCTURED
+    if any(k in q for k in HR_KEYWORDS):
+        st.session_state["last_route"] = "STRUCTURED"
+        return "STRUCTURED"
+
+    # 2) Datos de contacto → STRUCTURED
     structured_keywords = [
         "correo", "email", "teléfono", "telefono", "dirección", "ubicación",
         "nit", "sede", "horario", "redes", "instagram", "linkedin",
-        "facebook", "servicio", "atención"
+        "facebook", "servicio", "atención", "atencion", "página web", "sitio web", "web"
     ]
     if any(k in q for k in structured_keywords):
         st.session_state["last_route"] = "STRUCTURED"
         return "STRUCTURED"
 
-    # Si no hay coincidencia, usa el modelo para decidir
+    # 3) Fallback LLM
     try:
         decision = llm.invoke([
             {"role": "system", "content": ROUTER_PROMPT},
             {"role": "user", "content": user_query}
         ])
-        route = decision.content.strip().upper()
-        if route not in ["STRUCTURED", "RAG"]:
+        route = str(getattr(decision, "content", "")).strip().upper()
+        if route not in {"STRUCTURED", "RAG"}:
             route = "RAG"
         st.session_state["last_route"] = route
         return route
@@ -95,61 +144,57 @@ def route_query(user_query: str) -> str:
 # 💬 FUNCIÓN PRINCIPAL DEL CHATBOT
 # ==========================================================
 def chatbot(state: State):
-    last_user_msg = ""
-    for m in reversed(state["messages"]):
-        if isinstance(m, tuple) and m[0] == "user":
-            last_user_msg = m[1]
-            break
-        if isinstance(m, dict) and m.get("role") == "user":
-            last_user_msg = m.get("content", "")
-            break
+    # ✔️ Ahora sí obtenemos el texto del usuario, sin importar el tipo de objeto
+    last_user_msg = get_last_user_text(state["messages"])
+    q_lower = last_user_msg.lower().strip()
+    print(f"\n🗣️ Usuario: {q_lower!r}")
 
-    print(f"\n🗣️ Usuario: {last_user_msg}")
+    # Respuesta amable a saludos (sin forzar dominio)
+    if any(g in q_lower for g in GREETINGS) and "fanalca" not in q_lower:
+        return {"messages": [{"role": "assistant", "content": "¡Hola! Soy el asistente de Fanalca S.A. ¿Sobre qué tema de Fanalca te gustaría saber? (historia, misión/visión, unidades de negocio, sostenibilidad, contacto, empleo, etc.)"}]}
 
-    # Determinar ruta
     route = route_query(last_user_msg)
     print(f"🚦 Ruta elegida: {route}")
 
-    # STRUCTURED → usar JSON
+    # Dominio/marca
+    has_brand = any(b in q_lower for b in BRAND_TERMS) or ("fanalca" in q_lower)
+    has_hr = any(k in q_lower for k in HR_KEYWORDS)
+
+    # 1) Structured primero si aplica
     if route == "STRUCTURED":
         structured_response = structured_tool.get_info(last_user_msg).strip()
         print("✅ Structured Tool →", structured_response)
-
         if structured_response and "No tengo información" not in structured_response:
             return {"messages": [{"role": "assistant", "content": structured_response}]}
         else:
-            print("⚠️ Structured vacío, pasando a RAG...")
+            print("⚠️ Structured sin coincidencia, pasando a RAG…")
             route = "RAG"
 
-    # RAG → usar base vectorial
+    # 2) Filtro de dominio (bloquea off-topic, pero permite 'Fanalca' o HR+Fanalca)
+    if not has_brand and not ("fanalca" in q_lower or (has_hr and "fanalca" in q_lower)):
+        return {"messages": [{"role": "assistant", "content": "Lo siento, no tengo información sobre ese tema. Solo puedo responder sobre Fanalca S.A. y sus negocios."}]}
+
+    # 3) RAG
     print("📘 Usando RAG Retriever")
     context = retriever.build_context(last_user_msg, top_k=4)
+
+    if not context.strip():
+        return {"messages": [{"role": "assistant", "content": "Lo siento, no tengo información disponible en este momento relacionada con Fanalca."}]}
+
     system_prompt = f"""
-Eres un asistente virtual experto y confiable especializado exclusivamente en la empresa fanalca
+Eres un asistente virtual corporativo experto en Fanalca S.A.
+Responde únicamente con la información del CONTEXTO. Si no hay datos suficientes en el contexto para responder con seguridad, di:
+"Lo siento, no tengo esa información disponible en este momento porque mi conocimiento se limita a Fanalca."
 
-Tu objetivo es responder con precisión, claridad y lenguaje formal, utilizando únicamente la información contenida en el contexto siguiente, que proviene del sitio web oficial de Fanalca y sus fuentes verificadas:
-
-────────────────────────────
+──────────────── CONTEXTO ────────────────
 {context}
-────────────────────────────
+──────────────────────────────────────────
 
-💬 Instrucciones importantes:
-
-1. Analiza el contexto con atención. Si el usuario pregunta por elementos como **misión**, **visión**, **valores**, **propósito**, **pilares estratégicos**, **historia**, **unidades de negocio**, **sostenibilidad** o **Fundación Fanalca**, busca términos relacionados en el contexto aunque no estén escritos exactamente igual.
-   - Por ejemplo, si el contexto menciona “propósito superior” en lugar de “misión”, explica que ese es el equivalente a la misión corporativa.
-   - Si el texto habla de “visión de construcción colectiva”, puedes interpretarlo como la visión institucional.
-
-2. Si la información no aparece en el contexto o no tiene relación con fanalca, responde amablemente:
-   👉 “Lo siento, no tengo esa información disponible en este momento porque mi conocimiento se limita a fanalca”
-
-3. No inventes información externa, recetas, chistes o temas que no estén vinculados a fanalca.
-
-4. Responde de manera profesional, clara y con redacción natural, como si fueras un asistente corporativo de fanalca.
-
-5. Si no encuentras la información en el context, responde con:
-    "Lo siento, no tengo esa información disponible en este momento."
-    """
-
+Condiciones:
+- Mantén un tono claro y profesional.
+- No inventes datos ni salgas del dominio Fanalca.
+- Si la pregunta es de empleo/contratación y el contexto no trae detalles, orienta brevemente a los canales oficiales (sección 'Trabaja con nosotros' o LinkedIn de Fanalca).
+"""
     messages = [{"role": "system", "content": system_prompt}] + state["messages"]
     response = llm.invoke(messages)
     return {"messages": [response]}
@@ -180,21 +225,18 @@ if st.sidebar.button("🧹 Nueva conversación"):
     st.rerun()
 
 def chat_with_memory(user_input):
-    # Si la consulta es estructurada, responder directamente SIN pasar por el grafo
+    # Intento rápido con Structured si aplica
     route = route_query(user_input)
     if route == "STRUCTURED":
         structured_response = structured_tool.get_info(user_input).strip()
         if structured_response and "No tengo información" not in structured_response:
             st.session_state["last_route"] = "STRUCTURED"
             return structured_response
-        else:
-            route = "RAG"  # fallback si no hay match
 
-    # Si no fue structured o no hubo dato → usar RAG dentro del grafo
+    # Si no hubo structured, usar grafo (que internamente reintenta router + RAG)
     config = {"configurable": {"thread_id": st.session_state["thread_id"]}}
     result = graph.invoke({"messages": [("user", user_input)]}, config=config)
     last_msg = result["messages"][-1]
-
     st.session_state["last_route"] = "RAG"
 
     if isinstance(last_msg, dict) and "content" in last_msg:
@@ -202,7 +244,6 @@ def chat_with_memory(user_input):
     if hasattr(last_msg, "content"):
         return last_msg.content
     return str(last_msg)
-
 
 st.markdown("---")
 st.subheader("💬 Chat con Fanalca Bot")
