@@ -28,5 +28,10 @@
     "linkedin": "https://www.linkedin.com/company/fanalca-s-a/",
     "instagram": "No cuenta con instagram",
     "facebook": "No cuenta con facebook"
-  }
+  },
+  "empleo": {
+  "pagina": "https://fanalca.com/vacantes/",
+  "correo": "servicioalcliente@fanalca.com",
+  "plataforma": "https://www.linkedin.com/company/fanalca-s-a/"
+}
 }
