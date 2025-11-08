@@ -44,7 +44,7 @@ class FanalcaRetriever:
             results.append({
                 "url": self.docs[i].get("url", ""),
                 "titulo": self.docs[i].get("titulo", ""),
-                "texto": self.docs[i].get("texto", "")[:1500],
+                "texto": self.docs[i].get("texto", "")[:4000],
                 "score": float(sims[i])
             })
             if len(results) >= top_k:

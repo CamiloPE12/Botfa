@@ -59,9 +59,9 @@ class FanalcaStructuredTool:
             sc = self._get("servicio_cliente", default={}) or {}
             if any(k in q for k in ["cliente", "atención", "atencion", "servicio"]):
                 if sc.get("correo"):
-                    return f"✉️ El correo de atención al cliente es {sc['correo']}."
+                    return f" El correo de atención al cliente es {sc['correo']}."
             if self.data.get("correo_contacto"):
-                return f"✉️ Puedes escribirnos al correo general {self.data['correo_contacto']}."
+                return f" Puedes escribirnos al correo general {self.data['correo_contacto']}."
             return "No tengo información estructurada sobre correos."
 
         # ===== TELÉFONOS =====
@@ -69,37 +69,37 @@ class FanalcaStructuredTool:
             sc = self._get("servicio_cliente", default={}) or {}
             if any(k in q for k in ["cliente", "atención", "atencion", "servicio"]):
                 if sc.get("telefono"):
-                    return f"📞 El teléfono de atención al cliente de Fanalca es {sc['telefono']}."
+                    return f" El teléfono de atención al cliente de Fanalca es {sc['telefono']}."
             if self.data.get("telefono_principal"):
-                return f"📞 El teléfono principal de Fanalca es {self.data['telefono_principal']}."
+                return f" El teléfono principal de Fanalca es {self.data['telefono_principal']}."
             return "No tengo información estructurada sobre teléfonos."
 
         # ===== DIRECCIÓN Y HORARIOS =====
         if "dirección" in q or "direccion" in q or "ubicación" in q or "ubicacion" in q or "sede principal" in q:
             if self.data.get("direccion_principal"):
-                return f"📍 La sede principal está en {self.data['direccion_principal']}."
+                return f" La sede principal está en {self.data['direccion_principal']}."
             return "No tengo información estructurada sobre la dirección."
         if "horario" in q:
             if self.data.get("horario_atencion"):
-                return f"🕐 Nuestro horario de atención es {self.data['horario_atencion']}."
+                return f" Nuestro horario de atención es {self.data['horario_atencion']}."
             return "No tengo información estructurada sobre horarios."
 
         # ===== DATOS EMPRESARIALES =====
         if "nit" in q:
             if self.data.get("nit"):
-                return f"🔢 El NIT de Fanalca S.A. es {self.data['nit']}."
+                return f" El NIT de Fanalca S.A. es {self.data['nit']}."
             return "No tengo información estructurada sobre el NIT."
         if "sede" in q or "sedes" in q or "cali" in q:
             sedes = self.data.get("sedes", [])
             if sedes:
                 listado = "\n".join([f"- {s.get('ciudad', 'Sede')}: {s.get('direccion', '')}" for s in sedes])
-                return f"🏢 Nuestras sedes son:\n{listado}"
+                return f" Nuestras sedes son:\n{listado}"
             return "No tengo información estructurada sobre sedes."
 
         # ===== REDES Y WEB =====
         if "redes" in q or "sociales" in q or "instagram" in q or "linkedin" in q or "facebook" in q:
             redes = self.data.get("redes_sociales", {})
-            partes = ["🌐 Nuestros canales:"]
+            partes = [" Nuestros canales:"]
             if redes.get("linkedin"):
                 partes.append(f"- LinkedIn: {redes['linkedin']}")
             if redes.get("instagram"):
@@ -109,12 +109,12 @@ class FanalcaStructuredTool:
             if len(partes) > 1:
                 return "\n".join(partes)
             sitio = self.data.get("sitio_web")
-            return f"🌐 Sitio oficial: {sitio}" if sitio else "No tengo información estructurada sobre redes."
+            return f" Sitio oficial: {sitio}" if sitio else "No tengo información estructurada sobre redes."
 
-        # (✅ Línea corregida: sin coma después de 'q')
+        # ( Línea corregida: sin coma después de 'q')
         if ("sitio web" in q) or ("página web" in q) or ("pagina web" in q) or ("web" in q):
             sitio = self.data.get("sitio_web")
-            return f"🌍 Nuestro sitio web oficial es: {sitio}." if sitio else "No tengo información estructurada sobre el sitio web."
+            return f" Nuestro sitio web oficial es: {sitio}." if sitio else "No tengo información estructurada sobre el sitio web."
 
         # ===== SIN COINCIDENCIA =====
         return "No tengo información estructurada sobre esa consulta."

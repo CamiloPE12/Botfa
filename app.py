@@ -4,55 +4,93 @@ import uuid
 import streamlit as st
 from typing import Annotated
 from typing_extensions import TypedDict
-
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_ollama import ChatOllama
 from dotenv import load_dotenv
-
 from retriever import FanalcaRetriever
 from structured_tool import FanalcaStructuredTool
 
-# ==========================================================
-# ⚙️ CONFIGURACIÓN INICIAL
-# ==========================================================
-st.set_page_config(page_title="Fanalca Bot", page_icon="🤖", layout="centered")
+# CONFIGURACIÓN INICIAL
+st.set_page_config(page_title="Fanalca Bot", page_icon="fanalca.png", layout="centered")
 load_dotenv()
 
-st.markdown("""
-# 🤖 Fanalca Bot  
+st.image("fanalca.png", width=250)
+st.markdown(""" 
 _Asistente virtual corporativo de Fanalca._
 
-💡 Pregunta sobre historia, sostenibilidad, negocios o datos de contacto (NIT, correo, teléfono, etc.).  
-🧑‍💼 Para **empleo/contratación/vacantes**, te doy los canales oficiales de postulación.
+Pregunta sobre historia, sostenibilidad, negocios o datos de contacto (NIT, correo, teléfono, etc.).  
+Para **empleo/contratación/vacantes**, te doy los canales oficiales de postulación.
 """)
 
-# ==========================================================
-# 🎚️ CONTROL DE TEMPERATURA
-# ==========================================================
+# CONTROLES AVANZADOS DEL MODELO
+
+st.sidebar.markdown("##  Parámetros del modelo")
+
+# Temperatura (ya incluida)
 temperature = st.sidebar.slider(
     "Creatividad del modelo (temperature)",
     0.0, 1.5, 0.7, 0.1,
     help="Valores bajos → respuestas más precisas. Valores altos → más creativas."
 )
 
-# ==========================================================
-# 🧩 DEFINICIÓN DEL ESTADO
-# ==========================================================
+# Tokens máximos
+max_tokens = st.sidebar.slider(
+    "Máximo de tokens de salida",
+    100, 4096, 1024, 50,
+    help="Limita la longitud de la respuesta generada."
+)
+
+# Top-p (muestreo nucleus)
+top_p = st.sidebar.slider(
+    "Top-p (nucleus sampling)",
+    0.1, 1.0, 0.9, 0.05,
+    help="Controla la diversidad: 1.0 incluye todas las probabilidades; valores bajos hacen las respuestas más seguras."
+)
+
+# Penalización por frecuencia (repeticiones)
+frequency_penalty = st.sidebar.slider(
+    "Penalización por frecuencia",
+    0.0, 2.0, 0.0, 0.1,
+    help="Aumenta este valor para reducir repeticiones de palabras o frases."
+)
+
+# Penalización por presencia (nuevas ideas)
+presence_penalty = st.sidebar.slider(
+    "Penalización por presencia",
+    0.0, 2.0, 0.0, 0.1,
+    help="Aumenta este valor para fomentar que el modelo introduzca ideas nuevas."
+)
+
+# Penalización de repetición (para Ollama)
+repeat_penalty = st.sidebar.slider(
+    "Repeat penalty (Ollama)",
+    0.5, 2.0, 1.1, 0.1,
+    help="Reduce la probabilidad de repetir palabras exactas. 1.0 = sin penalización."
+)
+
+
+#  DEFINICIÓN DEL ESTADO
 class State(TypedDict):
     messages: Annotated[list, add_messages]
 
-# ==========================================================
-# 🤖 CONFIGURACIÓN DEL MODELO Y HERRAMIENTAS
-# ==========================================================
-llm = ChatOllama(model="gemma3:4b", temperature=temperature)
+# CONFIGURACIÓN DEL MODELO Y HERRAMIENTAS
+llm = ChatOllama(
+    model="gemma3:4b",
+    temperature=temperature,
+    model_kwargs={
+        "top_p": top_p,
+        "repeat_penalty": repeat_penalty,
+        "num_predict": max_tokens
+    }
+)
+
 retriever = FanalcaRetriever("fanalca_knowledge_base_final.json")
 structured_tool = FanalcaStructuredTool("structured_data.json")
 
-# ==========================================================
-# 🧠 META-PROMPT DEL AGENTE ROUTER
-# ==========================================================
+# META-PROMPT DEL AGENTE ROUTER
+
 ROUTER_PROMPT = """
 Eres el Agente Enrutador Inteligente de FANALCA BOT.
 Debes decidir cuál herramienta responde:
@@ -93,9 +131,9 @@ FOLLOW_UP_KEYWORDS = [
     "detalla", "otro", "ok", "dale", "bien", "listo", "anterior", "eso"
 ]
 
-# ==========================================================
-# 🧠 MEMORIA Y CONTEXTO (SESSION STATE)
-# ==========================================================
+
+#  MEMORIA Y CONTEXTO (SESSION STATE)
+
 if "history" not in st.session_state:
     st.session_state["history"] = []
 if "thread_id" not in st.session_state:
@@ -128,9 +166,8 @@ def is_follow_up(text: str) -> bool:
         return True
     return any(k in t for k in FOLLOW_UP_KEYWORDS)
 
-# ==========================================================
-# 🔎 UTILIDAD: EXTRAER TEXTO DEL ÚLTIMO MENSAJE DE USUARIO
-# ==========================================================
+# UTILIDAD: EXTRAER TEXTO DEL ÚLTIMO MENSAJE DE USUARIO
+
 def get_last_user_text(messages) -> str:
     for m in reversed(messages):
         if isinstance(m, tuple):
@@ -147,9 +184,8 @@ def get_last_user_text(messages) -> str:
             return content if isinstance(content, str) else str(content)
     return ""
 
-# ==========================================================
-# 🧍 Meta-conversación: nombre del usuario (memoria simple)
-# ==========================================================
+# Meta-conversación: nombre del usuario (memoria simple)
+
 ASK_NAME_TRIGGERS = [
     "como me llamo", "cómo me llamo", "sabes como me llamo", "sabes cómo me llamo",
     "sabes mi nombre", "recuerdas mi nombre", "cual es mi nombre", "cuál es mi nombre"
@@ -182,24 +218,22 @@ def handle_meta(user_text: str) -> str | None:
         return "Aún no me has dicho tu nombre. Si quieres, dime: “Me llamo …”."
     return None
 
-# ==========================================================
-# 🚦 FUNCIÓN DE ENRUTAMIENTO
-# ==========================================================
+# FUNCIÓN DE ENRUTAMIENTO
 def route_query(user_query: str) -> str:
     decay_in_domain(minutes=30)
     q = (user_query or "").lower().strip()
 
-    # 🔵 1) PRIORIDAD ABSOLUTA → HR / CONTACTO
+    # 1) PRIORIDAD ABSOLUTA → HR / CONTACTO
     if any(k in q for k in HR_KEYWORDS) or any(k in q for k in CONTACT_KEYWORDS):
         st.session_state["last_route"] = "STRUCTURED"
         return "STRUCTURED"
 
-    # 🟢 2) Seguimiento dentro del dominio → RAG
+    # 2) Seguimiento dentro del dominio → RAG
     if is_follow_up(q) and st.session_state.get("in_fanalca_context"):
         st.session_state["last_route"] = "RAG"
         return "RAG"
 
-    # 🟣 3) Fallback LLM
+    # 3) Fallback LLM
     try:
         decision = llm.invoke([
             {"role": "system", "content": ROUTER_PROMPT},
@@ -211,13 +245,11 @@ def route_query(user_query: str) -> str:
         st.session_state["last_route"] = route
         return route
     except Exception as e:
-        print("⚠️ Error en router:", e)
+        print(" Error en router:", e)
         st.session_state["last_route"] = "RAG"
         return "RAG"
 
-# ==========================================================
-# 💬 FUNCIÓN PRINCIPAL DEL CHATBOT (Nodo)
-# ==========================================================
+# FUNCIÓN PRINCIPAL DEL CHATBOT (Nodo)
 def chatbot(state: State):
     decay_in_domain(minutes=30)
 
@@ -239,7 +271,7 @@ def chatbot(state: State):
     has_hr = any(k in q_lower for k in HR_KEYWORDS)
     is_continuation = is_follow_up(q_lower)
 
-    # 🛡️ Fallback duro a STRUCTURED si hay términos de RRHH (aunque el router diga RAG)
+    # Fallback duro a STRUCTURED si hay términos de RRHH (aunque el router diga RAG)
     if has_hr and route != "STRUCTURED":
         structured_response = structured_tool.get_info(last_user_msg).strip()
         if structured_response and "No tengo información" not in structured_response:
@@ -250,12 +282,12 @@ def chatbot(state: State):
     # 1) Structured si aplica
     if route == "STRUCTURED":
         structured_response = structured_tool.get_info(last_user_msg).strip()
-        print("✅ Structured Tool →", structured_response)
+        print("Structured Tool →", structured_response)
         if structured_response and "No tengo información" not in structured_response:
             mark_in_domain()
             return {"messages": [{"role": "assistant", "content": structured_response}]}
         else:
-            print("⚠️ Structured sin coincidencia, pasando a RAG…")
+            print("Structured sin coincidencia, pasando a RAG…")
             route = "RAG"
 
     # 2) Filtro de dominio (flexible con seguimiento)
@@ -263,7 +295,7 @@ def chatbot(state: State):
         return {"messages": [{"role": "assistant", "content": "Lo siento, no tengo información sobre ese tema. Solo puedo responder sobre Fanalca S.A. y sus negocios."}]}
 
     # 3) RAG con "consulta efectiva" y contexto encadenado
-    print("📘 Usando RAG Retriever")
+    print("Usando RAG Retriever")
 
     effective_query = last_user_msg
     if is_continuation and not has_brand:
@@ -289,6 +321,8 @@ def chatbot(state: State):
 Eres un asistente virtual corporativo experto en Fanalca S.A.
 Responde únicamente con la información del CONTEXTO. Si no hay datos suficientes en el contexto para responder con seguridad, di:
 "Lo siento, no tengo esa información disponible en este momento porque mi conocimiento se limita a Fanalca."
+Responde de manera **detallada y extensa**, sin omitir datos relevantes.
+Usa toda la información del contexto y produce explicaciones completas y bien estructuradas.
 
 ──────────────── CONTEXTO ────────────────
 {context}
@@ -310,9 +344,7 @@ Condiciones:
 
     return {"messages": [response]}
 
-# ==========================================================
-# 🔗 GRAFO CONVERSACIONAL
-# ==========================================================
+# GRAFO CONVERSACIONAL
 graph_builder = StateGraph(State)
 graph_builder.add_node("chatbot", chatbot)
 graph_builder.add_edge(START, "chatbot")
@@ -320,9 +352,7 @@ graph_builder.add_edge("chatbot", END)
 memory = MemorySaver()
 graph = graph_builder.compile(checkpointer=memory)
 
-# ==========================================================
-# 🧹 Controles de sesión
-# ==========================================================
+# Controles de sesión
 if st.sidebar.button("🧹 Nueva conversación"):
     st.session_state["history"] = []
     st.session_state["thread_id"] = f"user-{uuid.uuid4().hex[:8]}"
@@ -332,9 +362,7 @@ if st.sidebar.button("🧹 Nueva conversación"):
     st.session_state["last_query"] = ""
     st.rerun()
 
-# ==========================================================
-# 🧠 Chat con memoria + meta
-# ==========================================================
+# Chat con memoria + meta
 def chat_with_memory(user_input: str) -> str:
     meta = handle_meta(user_input)
     if meta is not None:
@@ -360,11 +388,9 @@ def chat_with_memory(user_input: str) -> str:
         return last_msg.content
     return str(last_msg)
 
-# ==========================================================
-# 💬 INTERFAZ STREAMLIT
-# ==========================================================
+# INTERFAZ STREAMLIT
 st.markdown("---")
-st.subheader("💬 Chat con Fanalca Bot")
+st.subheader("Chat con Fanalca Bot")
 
 user_input = st.chat_input("Escribe tu pregunta aquí...")
 
@@ -380,15 +406,15 @@ for chat in st.session_state["history"]:
     with st.chat_message("assistant"):
         st.markdown(f"**[{chat['route']}]** {chat['bot']}")
 
-st.sidebar.markdown("### 🧭 Última ruta usada:")
+st.sidebar.markdown("### Última ruta usada:")
 st.sidebar.write(f"**{st.session_state['last_route']}**")
 
-st.sidebar.markdown("### 👤 Perfil recordado")
+st.sidebar.markdown("### Perfil recordado")
 name = st.session_state["user_profile"].get("name") or "—"
 st.sidebar.write(f"Nombre: **{name}**")
 
-with st.sidebar.expander("📜 Historial de conversación"):
+with st.sidebar.expander("Historial de conversación"):
     for i, chat in enumerate(st.session_state["history"], 1):
         st.markdown(f"**{i}. Usuario:** {chat['user']}")
-        st.markdown(f"**🤖 ({chat['route']})** {chat['bot']}")
+        st.markdown(f"** ({chat['route']})** {chat['bot']}")
         st.markdown("---")
