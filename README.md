@@ -40,7 +40,7 @@ El agente Router decide dinámicamente si una consulta debe ser resuelta por:
 |-------------|----------------------|----------|
 | **Frontend** | Streamlit | Interfaz web interactiva y adaptable |
 | **Agente LLM** | LangGraph + ChatOllama | Control de flujo conversacional con modelos locales |
-| **Modelo Base** | Gemma3:1b (Ollama) | Generación natural del lenguaje |
+| **Modelo Base** | Gemma3:4b (Ollama) | Generación natural del lenguaje |
 | **RAG Retriever** | scikit-learn (TF-IDF + cosine similarity) | Búsqueda semántica vectorial |
 | **Structured Tool** | JSON + Python | Base estructurada de datos corporativos |
 | **Web Scraper** | BeautifulSoup4, requests, tldextract, PyMuPDF | Extracción automatizada de texto del sitio oficial |
