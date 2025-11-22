@@ -20,11 +20,11 @@ El proyecto combina **procesamiento de lenguaje natural**, **recuperación semá
 ```mermaid
 graph TD
     A[Usuario] -->|Consulta| B[Agente Router Inteligente]
-    B -->|Evalúa tipo de pregunta| C1[Structured Tool 🧩]
-    B -->|Evalúa tipo de pregunta| C2[RAG Retriever 📚]
+    B -->|Evalúa tipo de pregunta| C1[Structured Tool ]
+    B -->|Evalúa tipo de pregunta| C2[RAG Retriever ]
     C1 -->|Devuelve datos exactos| D[ChatOllama - LLM]
     C2 -->|Contexto desde FAISS/TF-IDF| D
-    D -->|Genera respuesta final| E[Interfaz Streamlit 💬]
+    D -->|Genera respuesta final| E[Interfaz Streamlit ]
 ```
 
 El agente Router decide dinámicamente si una consulta debe ser resuelta por:
@@ -131,7 +131,7 @@ sequenceDiagram
     participant A as Agente Router
     participant S as Structured Tool
     participant R as RAG Retriever
-    participant L as ChatOllama (Gemma3:1b)
+    participant L as ChatOllama (Gemma3:4b)
     participant I as Interfaz Streamlit
 
     U->>A: Envía pregunta
@@ -151,35 +151,35 @@ sequenceDiagram
 
 | Tipo de Pregunta | Herramienta Usada | Respuesta Esperada |
 |------------------|------------------|--------------------|
-| “¿Cuál es el NIT de Fanalca?” | Structured Tool | 🔢 El NIT de Fanalca S.A. es 890.300.237-8. |
+| “¿Cuál es el NIT de Fanalca?” | Structured Tool | El NIT de Fanalca S.A. es 890.300.237-8. |
 | “¿Cuál es la visión de la empresa?” | RAG Retriever | Explica la visión basada en el texto de “Por qué trabajar en Fanalca”. |
 | “¿Qué unidades de negocio tiene Fanalca?” | RAG Retriever | Honda Motos, Honda Autos, Autopartes, Tubería y Perfiles, Ambiental, Fanalvías. |
-| “¿Dónde queda la sede principal?” | Structured Tool | 📍 Calle 13 #31A-80, Acopi Yumbo, Valle del Cauca. |
+| “¿Dónde queda la sede principal?” | Structured Tool |  Calle 13 #31A-80, Acopi Yumbo, Valle del Cauca. |
 
 ---
 
 ## Instalación y Ejecución
 
-### 1️⃣ Clonar el repositorio
+###  Clonar el repositorio
 ```bash
 git clone https://github.com/CamiloPE12/Botfa.git
 cd Botfa
 ```
 
-### 2️⃣ Crear entorno virtual
+###  Crear entorno virtual
 ```bash
 uv venv
 uv pip install -r requirements.txt
 ```
 
-### 3️⃣ Ejecutar el chatbot
+###  Ejecutar el chatbot
 ```bash
 streamlit run app.py
 ```
 
 ---
 
-## 🧩 Dependencias Principales
+##  Dependencias Principales
 
 ```text
 streamlit
@@ -206,7 +206,7 @@ flowchart LR
         KB --> Retriever[RAG Retriever]
         Tool --> Agent[Agente Router]
         Retriever --> Agent
-        Agent --> LLM[ChatOllama / Gemma3:1b]
+        Agent --> LLM[ChatOllama / Gemma3:4b]
     end
     LLM --> UI[Streamlit UI]
 ```
@@ -227,7 +227,5 @@ flowchart LR
 
 ##  Autor
 
-**Juan Camilo Peña Erazo**  
-Profesor de Desarrollo de Software – Área Técnica  
+**Juan Camilo Peña Erazo**   
 Cali, Colombia 🇨🇴   
-[GitHub: CamiloPE12](https://github.com/CamiloPE12)
